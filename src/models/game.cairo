@@ -57,6 +57,7 @@ pub struct Quiz {
     pub creator: ContractAddress,
     pub reward_settings: RewardSettings,
     pub created_at: u64,
+    pub game_sessions_created: u32
 }
 
 #derive[(Copy, Drop, Serde, Debug)]
@@ -111,6 +112,6 @@ pub struct QuizLeaderboard {
     #[key]
     pub player: ContractAddress,
     pub best_score: u32,
-    pub total_plays: u32,
+    pub total_player_participation: u32,
     pub win_count: u32,                  // Number of times ranked #1
 }
