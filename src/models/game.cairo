@@ -57,7 +57,9 @@ pub struct Quiz {
     pub creator: ContractAddress,
     pub reward_settings: RewardSettings,
     pub created_at: u64,
-    pub game_sessions_created: u32
+    pub game_sessions_created: u32,
+    pub platform_fees_generated: u256,
+    pub is_active: bool,
 }
 
 #derive[(Copy, Drop, Serde, Debug)]
@@ -72,7 +74,11 @@ pub struct  GameSession{
     pub current_question: u8,
     pub reward_distributed: bool,
     pub started_at: u64,
-    pub ended_at:  u64
+    pub ended_at:  u64,
+    pub total_reward_pool: u256,
+    pub platform_fees_collected: u256,
+    pub max_players: u32,
+    pub entry_fee_collected: u256,
 }
 
 #[derive(Copy, Drop, Serde, Debug)]
@@ -102,6 +108,7 @@ pub struct PlayerResult {
     pub rank: u8,                        // Final ranking (1st, 2nd, 3rd, etc.)
     pub reward_amount: u256,             // Crypto reward earned
     pub reward_claimed: bool,
+    pub bonus_points: u16
 }
 
 #[derive(Copy, Drop, Serde, Debug)]
@@ -114,4 +121,5 @@ pub struct QuizLeaderboard {
     pub best_score: u32,
     pub total_player_participation: u32,
     pub win_count: u32,                  // Number of times ranked #1
+    pub total_points_eraned: u32,
 }
