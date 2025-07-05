@@ -1,26 +1,10 @@
-use zappquiz::models::quiz::{RewardSettings, PrizeDistribution};
+use zappquiz::models::quiz::{RewardSettings, PrizeDistribution, Question, Quiz};
 use zappquiz::models::analytics::{CreatorStats, PlatformStats};
-use zappquiz::models::quiz::{Question, Quiz};
 use zappquiz::models::system::{PlatformConfig};
 
 use starknet::{ContractAddress, get_caller_address, get_block_timestamp, contract_address_const};
 
-#[starknet::interface]
-pub trait IGameActions<T> {
-    fn create_quiz(
-        ref self: T,
-        title: felt252,
-        description: ByteArray,
-        category: felt252,
-        questions: Array<Question>,
-        public: bool,
-        default_duration: u8,
-        default_max_points: u16,
-        custom_timing: bool,
-        creator: ContractAddress,
-        reward_settings: RewardSettings,
-    );
-}
+use zappquiz::interfaces::IZappQuiz::{IZappQuiz, };
 
 #[dojo::contract]
 pub mod GameActions {
@@ -41,7 +25,7 @@ pub mod GameActions {
     }
 
     #[abi(embed_v0)]
-    impl GameActionsImpl of IGameActions<ContractState> {
+    impl ZappQuizImpl of IZappQuiz<ContractState> {
         fn create_quiz(
             ref self: ContractState,
             title: felt252,
@@ -83,6 +67,7 @@ pub mod GameActions {
                     assert!(total_percentage == 100, "Prize percentages must sum to 100");
                 }
             }
+            
             let mut quiz: Quiz = world.read_model(1);
             quiz =
                 Quiz {
