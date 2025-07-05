@@ -1,5 +1,9 @@
+pub mod interfaces{
+    pub mod IZappQuiz;
+}
+
 pub mod systems {
-    pub mod game_actions;
+    pub mod ZappQuiz;
 }
 
 pub mod models {
