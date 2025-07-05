@@ -1,9 +1,13 @@
 pub mod systems {
-    pub mod actions;
+    pub mod game_actions;
 }
 
-pub mod models{
+pub mod models {
     pub mod game;
+    pub mod player;
+    pub mod quiz;
+    pub mod system;
+    pub mod analytics;
 }
 
 pub mod tests {
