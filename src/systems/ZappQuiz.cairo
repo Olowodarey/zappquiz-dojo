@@ -1,14 +1,13 @@
-use zappquiz::models::quiz::{RewardSettings, PrizeDistribution, Question, Quiz};
-use zappquiz::models::analytics::{CreatorStats, PlatformStats};
-use zappquiz::models::system::{PlatformConfig};
-
-use starknet::{ContractAddress, get_caller_address, get_block_timestamp, contract_address_const};
-
-use zappquiz::interfaces::IZappQuiz::{IZappQuiz, };
-
 #[dojo::contract]
 pub mod GameActions {
-    use super::*;
+    
+    use zappquiz::models::quiz::{RewardSettings, PrizeDistribution, Question, Quiz};
+    use zappquiz::models::analytics::{CreatorStats, PlatformStats};
+    use zappquiz::models::system::{PlatformConfig};
+
+    use starknet::{ContractAddress, get_caller_address, get_block_timestamp, contract_address_const};
+
+    use zappquiz::interfaces::IZappQuiz::{IZappQuiz, };
 
     use dojo::model::{ModelStorage};
     use dojo::event::EventStorage;

@@ -1,6 +1,5 @@
 use starknet::{ContractAddress};
 
-
 #[derive(Copy, Drop, Introspect, Serde, Debug)]
 pub enum GameStatus {
     Waiting,
