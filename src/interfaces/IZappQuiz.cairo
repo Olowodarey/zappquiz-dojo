@@ -1,4 +1,4 @@
-use zappquiz::models::quiz::{RewardSettings, Question};
+use zappquiz::models::quiz_model::{RewardSettings, Question};
 use starknet::ContractAddress;
 
 #[starknet::interface]

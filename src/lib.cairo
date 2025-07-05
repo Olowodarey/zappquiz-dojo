@@ -7,11 +7,11 @@ pub mod systems {
 }
 
 pub mod models {
-    pub mod game;
-    pub mod player;
-    pub mod quiz;
-    pub mod system;
-    pub mod analytics;
+    pub mod game_model;
+    pub mod player_model;
+    pub mod quiz_model;
+    pub mod system_model;
+    pub mod analytics_model;
 }
 
 pub mod tests {

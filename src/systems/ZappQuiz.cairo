@@ -1,9 +1,9 @@
 #[dojo::contract]
 pub mod GameActions {
     
-    use zappquiz::models::quiz::{RewardSettings, PrizeDistribution, Question, Quiz};
-    use zappquiz::models::analytics::{CreatorStats, PlatformStats};
-    use zappquiz::models::system::{PlatformConfig};
+    use zappquiz::models::quiz_model::{RewardSettings, PrizeDistribution, Question, Quiz};
+    use zappquiz::models::analytics_model::{CreatorStats, PlatformStats};
+    use zappquiz::models::system_model::{PlatformConfig};
 
     use starknet::{ContractAddress, get_caller_address, get_block_timestamp, contract_address_const};
 
