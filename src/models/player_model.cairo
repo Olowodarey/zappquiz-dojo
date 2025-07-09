@@ -1,7 +1,7 @@
 use starknet::ContractAddress;
 
 // Player's Achievements/Badges
-#[derive(Copy, Drop, Serde, Debug)]
+#[derive(Copy, Drop, Serde, Debug, Introspect)]
 pub enum AchievementType {
     FirstWin,                           // Won first game
     SpeedDemon,                         // Answered all questions under 5 seconds
@@ -11,6 +11,14 @@ pub enum AchievementType {
     BigWinner,                          // Earned over 1000 USDC in rewards
     CategoryExpert,                     // Won 10 games in same category
     QuickDraw,                          // Fastest answer in a game
+}
+
+#[derive(Serde, Copy, Drop, Introspect, PartialEq)]
+#[dojo::model]
+pub struct PlayerCounter {
+    #[key]
+    pub id: felt252,
+    pub current_val: u256,
 }
 
 
@@ -46,7 +54,7 @@ pub struct PlayerAnswer {
     pub is_correct: bool,
 }
 
-#[derive(Copy, Drop, Serde, Debug)]
+#[derive(Copy, Drop, Serde, Debug, Introspect)]
 #[dojo::model]
 pub struct PlayerResult {
     #[key]
