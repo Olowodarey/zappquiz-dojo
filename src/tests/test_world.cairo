@@ -1,42 +1,53 @@
 #[cfg(test)]
 mod tests {
-    use dojo_cairo_test::WorldStorageTestTrait;
+    // === Imports ===
     use dojo::model::{ModelStorage, ModelStorageTest};
     use dojo::world::WorldStorageTrait;
     use dojo_cairo_test::{
-        spawn_test_world, NamespaceDef, TestResource, ContractDefTrait, ContractDef,
+        spawn_test_world, NamespaceDef, TestResource, ContractDef, ContractDefTrait, WorldStorageTestTrait
+    };
+    use starknet::{contract_address_const, testing, get_block_timestamp};
+
+    use zapp_quiz::interfaces::IZappQuiz::{IZappQuizDispatcher, IZappQuizDispatcherTrait};
+
+    use zapp_quiz::models::quiz_model::{
+        Quiz, m_Quiz, m_QuizCounter, RewardSettings, PrizeDistribution
     };
 
-    use dojo_starter::systems::actions::{actions, IActionsDispatcher, IActionsDispatcherTrait};
-    use dojo_starter::models::{Position, m_Position, Moves, m_Moves, Direction};
+    use zapp_quiz::models::question_model::{Question, m_Question, QuestionType};
 
+    use zapp_quiz::models::question_model::QuestionTrait;
+
+    use zapp_quiz::systems::ZappQuiz::ZappQuiz;
+
+    // === Define Resources ===
     fn namespace_def() -> NamespaceDef {
         let ndef = NamespaceDef {
-            namespace: "dojo_starter",
+            namespace: "zappquiz",
             resources: [
-                TestResource::Model(m_Position::TEST_CLASS_HASH),
-                TestResource::Model(m_Moves::TEST_CLASS_HASH),
-                TestResource::Event(actions::e_Moved::TEST_CLASS_HASH),
-                TestResource::Contract(actions::TEST_CLASS_HASH),
+                TestResource::Model(m_Quiz::TEST_CLASS_HASH),
+                TestResource::Model(m_QuizCounter::TEST_CLASS_HASH),
+                TestResource::Event(ZappQuiz::e_QuizCreated::TEST_CLASS_HASH),
+                TestResource::Contract(ZappQuiz::TEST_CLASS_HASH),
             ]
-                .span(),
+            .span(),
         };
-
         ndef
     }
 
     fn contract_defs() -> Span<ContractDef> {
         [
-            ContractDefTrait::new(@"dojo_starter", @"actions")
-                .with_writer_of([dojo::utils::bytearray_hash(@"dojo_starter")].span())
+            ContractDefTrait::new(@"zappquiz", @"ZappQuiz")
+                .with_writer_of([dojo::utils::bytearray_hash(@"zappquiz")].span())
         ]
             .span()
     }
 
+    // === Test create_quiz ===
     #[test]
-    fn test_world_test_set() {
-        // Initialize test environment
-        let caller = starknet::contract_address_const::<0x0>();
+    fn test_create_quiz(){
+        let caller_1 = contract_address_const::<'Akos'>();
+
         let ndef = namespace_def();
 
         // Register the resources.
@@ -45,55 +56,81 @@ mod tests {
         // Ensures permissions and initializations are synced.
         world.sync_perms_and_inits(contract_defs());
 
-        // Test initial position
-        let mut position: Position = world.read_model(caller);
-        assert(position.vec.x == 0 && position.vec.y == 0, 'initial position wrong');
-
-        // Test write_model_test
-        position.vec.x = 122;
-        position.vec.y = 88;
-
-        world.write_model_test(@position);
-
-        let mut position: Position = world.read_model(caller);
-        assert(position.vec.y == 88, 'write_value_from_id failed');
-
-        // Test model deletion
-        world.erase_model(@position);
-        let position: Position = world.read_model(caller);
-        assert(position.vec.x == 0 && position.vec.y == 0, 'erase_model failed');
-    }
-
-    #[test]
-    #[available_gas(30000000)]
-    fn test_move() {
-        let caller = starknet::contract_address_const::<0x0>();
-
         let ndef = namespace_def();
         let mut world = spawn_test_world([ndef].span());
         world.sync_perms_and_inits(contract_defs());
 
-        let (contract_address, _) = world.dns(@"actions").unwrap();
-        let actions_system = IActionsDispatcher { contract_address };
+        let (contract_address, _) = world.dns(@"zappquiz").unwrap();
+        let actions_system = IZappQuizDispatcher { contract_address };
 
-        actions_system.spawn();
-        let initial_moves: Moves = world.read_model(caller);
-        let initial_position: Position = world.read_model(caller);
+        testing::set_contract_address(caller_1);
 
-        assert(
-            initial_position.vec.x == 10 && initial_position.vec.y == 10, 'wrong initial position',
+        //declare title 
+        let title = "Zero sum game";
+
+        let description = "When you finally get it your name would be written in the stars"; 
+
+        let mut options = ArrayTrait::new();
+        options.append("true");
+        options.append("false");
+
+        let category = "Maths";
+
+        let question = QuestionTrait::new(
+            25, 
+            "What is 2 + 2 = 4?",
+            QuestionType::TrueFalse,
+            options,
+            "false",
+            30_u8,
+            10_u8,  
+            10_u16,
         );
 
-        actions_system.move(Direction::Right(()).into());
+        let dummy_questions: Array<Question> = array![question];
+        
+        let reward_settings = RewardSettings {
+            has_rewards: true,
+                token_address: contract_address_const::<'Akos'>(),
+                reward_amount: 1000000000000000000,
+                distribution_type: PrizeDistribution::Custom,
+                number_of_winners: 2,
+                prize_percentage: array![10, 20, 30, 40, 50],
+                min_players: 2,
+        };
 
-        let moves: Moves = world.read_model(caller);
-        let right_dir_felt: felt252 = Direction::Right(()).into();
+        let Quiz = actions_system.create_quiz(
+            title.clone(),
+            description.clone(),
+            category.clone(),
+            dummy_questions.clone(),
+            public: true,
+            default_duration: 3000,
+            default_max_points: 1000,
+            custom_timing: true,
+            creator: caller_1,
+            reward_settings: reward_settings.clone(),
+        );
 
-        assert(moves.remaining == initial_moves.remaining - 1, 'moves is wrong');
-        assert(moves.last_direction.unwrap().into() == right_dir_felt, 'last direction is wrong');
+        // let Quiz = world.read_model(quiz_id);
+        // Quiz
 
-        let new_position: Position = world.read_model(caller);
-        assert(new_position.vec.x == initial_position.vec.x + 1, 'position x is wrong');
-        assert(new_position.vec.y == initial_position.vec.y, 'position y is wrong');
+        // assert!(Quiz.id == quiz_id, "Quiz ID does not match");
+        assert!(Quiz.title == title, "Quiz title does not match");
+        assert!(Quiz.description == description, "Quiz description does not match");
+        assert!(Quiz.category == category, "Quiz category does not match");
+        assert!(Quiz.questions == dummy_questions, "Quiz questions do not match");
+        assert!(Quiz.public == true, "Quiz public does not match");
+        assert!(Quiz.default_duration == 3000, "Quiz default duration does not match");
+        assert!(Quiz.default_max_points == 1000, "Quiz default max points does not match");
+        assert!(Quiz.custom_timing == true, "Quiz custom timing does not match");
+        assert!(Quiz.creator == caller_1, "Quiz creator does not match");
+        assert!(Quiz.reward_settings == reward_settings, "Quiz reward settings do not match");
+        assert!(Quiz.created_at == get_block_timestamp(), "Quiz created at does not match");
+        assert!(Quiz.game_sessions_created == 0, "Quiz game sessions created does not match");
+        assert!(Quiz.total_rewards_distributed == 0, "Quiz total rewards distributed does not match");
+        assert!(Quiz.platform_fees_generated == 0, "Quiz platform fees generated does not match");
+        assert!(Quiz.is_active == false, "Quiz is active does not match");
+   
     }
 }
