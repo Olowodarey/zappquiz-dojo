@@ -1,19 +1,22 @@
-use starknet::ContractAddress;
+use starknet::{ContractAddress};
+use zapp_quiz::models::question_model::Question;
 
-#[derive(Copy, Drop, Introspect, Serde, Debug)]
-pub enum QuestionType {
-    multichoice,
-    TrueFalse,
-}
-
-#[derive(Copy, Drop, Introspect, Serde, Debug, PartialEq)]
+#[derive(Debug, Serde, Copy, Drop, Introspect, PartialEq)]
 pub enum PrizeDistribution {
     WinnerTakesAll,
     SplitTopThree,
     Custom,
 }
 
-#[derive(Clone, Drop, Introspect, Serde, Debug)]
+#[derive(Serde, Copy, Drop, Introspect, PartialEq)]
+#[dojo::model]
+pub struct QuizCounter {
+    #[key]
+    pub id: felt252,
+    pub current_val: u256,
+}
+
+#[derive(Clone, Drop, Introspect, Serde, Debug, PartialEq)]
 pub struct RewardSettings {
     pub has_rewards: bool,
     pub token_address: ContractAddress,
@@ -28,12 +31,13 @@ pub struct RewardSettings {
 #[dojo::model]
 pub struct Quiz {
     #[key]
-    pub title: felt252,
+    pub id: u256,
+    pub title: ByteArray,
     pub description: ByteArray,
-    pub category: felt252,
+    pub category: ByteArray,
     pub questions: Array<Question>,
     pub public: bool,
-    pub default_duration: u8,
+    pub default_duration: u256,
     pub default_max_points: u16,
     pub custom_timing: bool,
     pub creator: ContractAddress,
@@ -43,20 +47,6 @@ pub struct Quiz {
     pub total_rewards_distributed: u256,
     pub platform_fees_generated: u256,
     pub is_active: bool,
-}
-
-#[derive(Clone, Drop, Serde, Debug)]
-#[dojo::model]
-pub struct Question {
-    #[key]
-    pub id: u256,
-    pub text: ByteArray,
-    pub question_type: QuestionType,
-    pub options: Array<felt252>,
-    pub correct_option: u8,
-    pub duration_seconds: u8,
-    pub point: u8,
-    pub max_points: u16,
 }
 
 #[derive(Clone, Drop, Serde, Debug)]
@@ -84,3 +74,8 @@ pub struct QuizLeaderboard {
     pub win_count: u32, // Number of times ranked #1
     pub total_points_earned: u32,
 }
+
+// #[dojo::interface]
+// pub trait QuizTrait {
+//     fn create_quiz(id: u256, title: ByteArray, description: ByteArray, category: ByteArray, questions: Array<Question>, public: bool, default_duration: u256, default_max_points: u16, custom_timing: bool, creator: ContractAddress, reward_settings: RewardSettings, created_at: u64, game_sessions_created: u32, total_rewards_distributed: u256, platform_fees_generated: u256, is_active: bool) -> Quiz;
+// }

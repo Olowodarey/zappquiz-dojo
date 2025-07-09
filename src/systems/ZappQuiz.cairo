@@ -1,43 +1,53 @@
 #[dojo::contract]
-pub mod GameActions {
+pub mod ZappQuiz {
     
-    use zappquiz::models::quiz_model::{RewardSettings, PrizeDistribution, Question, Quiz};
-    use zappquiz::models::analytics_model::{CreatorStats, PlatformStats};
-    use zappquiz::models::system_model::{PlatformConfig};
+    use zapp_quiz::models::quiz_model::{RewardSettings, PrizeDistribution, Quiz, QuizCounter};
+    use zapp_quiz::models::analytics_model::{CreatorStats, PlatformStats};
+    use zapp_quiz::models::system_model::{PlatformConfig};
+    use zapp_quiz::models::question_model::Question;
 
     use starknet::{ContractAddress, get_caller_address, get_block_timestamp, contract_address_const};
 
-    use zappquiz::interfaces::IZappQuiz::{IZappQuiz, };
+    use zapp_quiz::interfaces::IZappQuiz::{IZappQuiz};
 
     use dojo::model::{ModelStorage};
     use dojo::event::EventStorage;
 
-
     // Game Events
-    #[derive(Copy, Drop, Serde, Debug)]
+    #[derive(Clone, Drop, Serde, Debug)]
     #[dojo::event]
     pub struct QuizCreated {
         #[key]
-        pub title: felt252,
+        pub title: ByteArray,
         pub creator: ContractAddress,
         pub timestamp: u64,
     }
 
     #[abi(embed_v0)]
-    impl ZappQuizImpl of IZappQuiz<ContractState> {
+    pub impl ZappQuizImpl of IZappQuiz<ContractState> {
+
+        fn create_new_quiz_id(ref self: ContractState) -> u256{
+            let mut world = self.world_default();
+            let mut quiz_counter: QuizCounter = world.read_model('v0');
+            let new_val = quiz_counter.current_val + 1;
+            quiz_counter.current_val = new_val;
+            world.write_model(@quiz_counter);
+            new_val
+        }
+
         fn create_quiz(
             ref self: ContractState,
-            title: felt252,
+            title: ByteArray,
             description: ByteArray,
-            category: felt252,
+            category: ByteArray,
             questions: Array<Question>,
             public: bool,
-            default_duration: u8,
+            default_duration: u256,
             default_max_points: u16,
             custom_timing: bool,
             creator: ContractAddress,
             reward_settings: RewardSettings,
-        ) {
+        ) -> Quiz {
             let mut world = self.world_default();
 
             let caller = get_caller_address();
@@ -66,11 +76,14 @@ pub mod GameActions {
                     assert!(total_percentage == 100, "Prize percentages must sum to 100");
                 }
             }
+
+            let title_for_quiz = title.clone();
             
-            let mut quiz: Quiz = world.read_model(1);
-            quiz =
-                Quiz {
-                    title,
+            let id = self.create_new_quiz_id();
+
+            let mut quiz: Quiz = Quiz {
+                    id,
+                    title: title_for_quiz,
                     description,
                     category,
                     questions,
@@ -95,6 +108,8 @@ pub mod GameActions {
 
             // Emit event
             world.emit_event(@QuizCreated { title, creator, timestamp });
+
+            quiz
         }
     }
 
@@ -103,7 +118,7 @@ pub mod GameActions {
     impl InternalImpl of InternalTrait {
         // Helper function to get the default world storage
         fn world_default(self: @ContractState) -> dojo::world::WorldStorage {
-            self.world(@"dojo_starter")
+            self.world(@"zappquiz")
         }
 
         fn _update_creator_stats(
@@ -117,13 +132,15 @@ pub mod GameActions {
 
             // Initialize if first time (check if creator address is zero)
             if creator_stats.creator == contract_address_const::<0>() {
-                creator_stats.creator = creator;
-                creator_stats.total_quizzes_created = 0;
-                creator_stats.total_games_hosted = 0;
-                creator_stats.total_rewards_distributed = 0;
-                creator_stats.total_platform_fees_paid = 0;
-                creator_stats.average_game_size = 0;
-                creator_stats.last_activity = get_block_timestamp();
+                creator_stats = CreatorStats {
+                    creator: creator,
+                    total_quizzes_created: 0,
+                    total_games_hosted: 0,
+                    total_rewards_distributed: 0,
+                    total_platform_fees_paid: 0,
+                    average_game_size: 0,
+                    last_activity: get_block_timestamp(),
+                };
             }
 
             // Update based on action type
@@ -133,8 +150,11 @@ pub mod GameActions {
                 creator_stats.total_games_hosted += 1;
             }
 
-            creator_stats.last_activity = get_block_timestamp();
-            world.write_model(@creator_stats);
+            let updated_creator_stats = CreatorStats {
+                last_activity: get_block_timestamp(),
+                ..creator_stats
+            };
+            world.write_model(@updated_creator_stats);
         }
 
         fn _initialize_platform_config(ref self: ContractState) {
