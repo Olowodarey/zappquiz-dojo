@@ -12,7 +12,7 @@ pub struct Question {
     pub text: ByteArray,
     pub question_type: QuestionType,
     pub options: Array<ByteArray>,
-    pub correct_option: ByteArray,
+    pub correct_option: u8,
     pub duration_seconds: u8,
     pub point: u8,
     pub max_points: u16,
@@ -20,11 +20,11 @@ pub struct Question {
 
 
 pub trait QuestionTrait {
-    fn new(id: u256, text: ByteArray, question_type: QuestionType, options: Array<ByteArray>, correct_option: ByteArray, duration_seconds: u8, point: u8, max_points: u16) -> Question;
+    fn new(id: u256, text: ByteArray, question_type: QuestionType, options: Array<ByteArray>, correct_option: u8, duration_seconds: u8, point: u8, max_points: u16) -> Question;
 }
 
 impl implQuestion of QuestionTrait {
-    fn new(id: u256, text: ByteArray, question_type: QuestionType, options: Array<ByteArray>, correct_option: ByteArray, duration_seconds: u8, point: u8, max_points: u16) -> Question {
+    fn new(id: u256, text: ByteArray, question_type: QuestionType, options: Array<ByteArray>, correct_option: u8, duration_seconds: u8, point: u8, max_points: u16) -> Question {
         Question {
             id,
             text,
