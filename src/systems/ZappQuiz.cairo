@@ -118,7 +118,7 @@ pub mod ZappQuiz {
     impl InternalImpl of InternalTrait {
         // Helper function to get the default world storage
         fn world_default(self: @ContractState) -> dojo::world::WorldStorage {
-            self.world(@"zappquiz")
+            self.world(@"zapp_quiz")
         }
 
         fn _update_creator_stats(
