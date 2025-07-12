@@ -17,6 +17,7 @@ pub trait IZappQuiz<T> {
         custom_timing: bool,
         creator: ContractAddress,
         reward_settings: RewardSettings,
+        amount: u256,
     ) -> Quiz;
     
     fn create_new_quiz_id(ref self: T,) -> u256;
