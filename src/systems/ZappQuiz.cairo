@@ -47,6 +47,7 @@ pub mod ZappQuiz {
             custom_timing: bool,
             creator: ContractAddress,
             reward_settings: RewardSettings,
+            amount:  u256,
         ) -> Quiz {
             let mut world = self.world_default();
 
@@ -59,6 +60,16 @@ pub mod ZappQuiz {
             // Validate quiz data
             assert!(questions.len() > 0, "Quiz must have at least one question");
             assert!(questions.len() <= 50, "Quiz cannot have more than 50 questions");
+
+            let reward_settings = RewardSettings{
+                has_rewards: true,
+                token_address: contract_address_const::<'Akos'>(),
+                reward_amount: amount,
+                distribution_type: PrizeDistribution::Custom,
+                number_of_winners: 2,
+                prize_percentage: array![50, 30, 20],
+                min_players: 2,
+            };
 
             // Validate reward settings
             if reward_settings.has_rewards {
@@ -111,6 +122,13 @@ pub mod ZappQuiz {
 
             quiz
         }
+
+        // fn fund_quiz(ref self: ContractState, quiz_id: u256, amount: u256) {
+        //     let mut world = self.world_default();
+        //     let mut quiz: Quiz = world.read_model(quiz_id);
+        //     quiz.reward_settings.reward_amount += amount;
+        //     world.write_model(@quiz);
+        // }   
     }
 
 
