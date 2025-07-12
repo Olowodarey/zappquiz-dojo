@@ -74,8 +74,3 @@ pub struct QuizLeaderboard {
     pub win_count: u32, // Number of times ranked #1
     pub total_points_earned: u32,
 }
-
-// #[dojo::interface]
-// pub trait QuizTrait {
-//     fn create_quiz(id: u256, title: ByteArray, description: ByteArray, category: ByteArray, questions: Array<Question>, public: bool, default_duration: u256, default_max_points: u16, custom_timing: bool, creator: ContractAddress, reward_settings: RewardSettings, created_at: u64, game_sessions_created: u32, total_rewards_distributed: u256, platform_fees_generated: u256, is_active: bool) -> Quiz;
-// }
