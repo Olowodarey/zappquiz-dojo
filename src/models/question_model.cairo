@@ -23,7 +23,7 @@ pub trait QuestionTrait {
     fn new(id: u256, text: ByteArray, question_type: QuestionType, options: Array<ByteArray>, correct_option: u8, duration_seconds: u8, point: u8, max_points: u16) -> Question;
 }
 
-impl implQuestion of QuestionTrait {
+pub impl QuestionImpl of QuestionTrait {
     fn new(id: u256, text: ByteArray, question_type: QuestionType, options: Array<ByteArray>, correct_option: u8, duration_seconds: u8, point: u8, max_points: u16) -> Question {
         Question {
             id,

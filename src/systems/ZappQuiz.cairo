@@ -1,10 +1,10 @@
 #[dojo::contract]
 pub mod ZappQuiz {
     
-    use zapp_quiz::models::quiz_model::{RewardSettings, PrizeDistribution, Quiz, QuizCounter};
+    use zapp_quiz::models::quiz_model::{RewardSettings, PrizeDistribution, Quiz, QuizCounter, QuizDetails};
     use zapp_quiz::models::analytics_model::{CreatorStats, PlatformStats};
     use zapp_quiz::models::system_model::{PlatformConfig};
-    use zapp_quiz::models::question_model::Question;
+    use zapp_quiz::models::question_model::{Question,};
 
     use starknet::{ContractAddress, get_caller_address, get_block_timestamp, contract_address_const};
 
@@ -33,9 +33,18 @@ pub mod ZappQuiz {
             quiz_counter.current_val = new_val;
             world.write_model(@quiz_counter);
             new_val
+
+
         }
 
-        fn create_quiz(
+        fn add_question(ref self: ContractState, question: Question) {
+        }
+
+        fn delete_question(ref self: ContractState, question_id: u256) {
+        }
+
+        
+       fn create_quiz(
             ref self: ContractState,
             title: ByteArray,
             description: ByteArray,
@@ -48,6 +57,12 @@ pub mod ZappQuiz {
             creator: ContractAddress,
             reward_settings: RewardSettings,
             amount:  u256,
+            has_rewards: bool,
+            distribution_type: PrizeDistribution,
+            number_of_winners: u8,
+            prize_percentage: Array<u8>,
+            min_players: u32,
+
         ) -> Quiz {
             let mut world = self.world_default();
 
@@ -61,14 +76,21 @@ pub mod ZappQuiz {
             assert!(questions.len() > 0, "Quiz must have at least one question");
             assert!(questions.len() <= 50, "Quiz cannot have more than 50 questions");
 
+            let quiz_details = QuizDetails{
+                quiz_title: title,
+                description: description,
+                category: category,
+                visibility: public,
+            };
+
             let reward_settings = RewardSettings{
                 has_rewards: true,
                 token_address: contract_address_const::<'Akos'>(),
                 reward_amount: amount,
-                distribution_type: PrizeDistribution::Custom,
-                number_of_winners: 2,
-                prize_percentage: array![50, 30, 20],
-                min_players: 2,
+                distribution_type: distribution_type,
+                number_of_winners: number_of_winners,
+                prize_percentage: prize_percentage,
+                min_players: min_players,
             };
 
             // Validate reward settings
@@ -87,28 +109,23 @@ pub mod ZappQuiz {
                     assert!(total_percentage == 100, "Prize percentages must sum to 100");
                 }
             }
-
-            let title_for_quiz = title.clone();
             
             let id = self.create_new_quiz_id();
 
             let mut quiz: Quiz = Quiz {
                     id,
-                    title: title_for_quiz,
-                    description,
-                    category,
+                    quiz_details,
                     questions,
-                    public,
                     default_duration,
                     default_max_points,
                     custom_timing,
-                    creator: caller,
+                    creator,
                     reward_settings,
                     created_at: timestamp,
                     game_sessions_created: 0,
                     total_rewards_distributed: 0,
                     platform_fees_generated: 0,
-                    is_active: false,
+                    is_active: true,
                 };
 
             // Store the quiz
@@ -123,12 +140,6 @@ pub mod ZappQuiz {
             quiz
         }
 
-        // fn fund_quiz(ref self: ContractState, quiz_id: u256, amount: u256) {
-        //     let mut world = self.world_default();
-        //     let mut quiz: Quiz = world.read_model(quiz_id);
-        //     quiz.reward_settings.reward_amount += amount;
-        //     world.write_model(@quiz);
-        // }   
     }
 
 
@@ -140,7 +151,7 @@ pub mod ZappQuiz {
         }
 
         fn _update_creator_stats(
-            ref self: ContractState,
+            ref self: ContractState,    
             creator: ContractAddress,
             action_type: felt252 // 'quiz_created', 'game_hosted', etc.
         ) {
@@ -209,3 +220,49 @@ pub mod ZappQuiz {
         }
     }
 }
+
+
+// fn update_quiz_reward_settings(
+//     ref self: ContractState,
+//     quiz_id: u256,
+//     new_token_address: ContractAddress,
+//     new_reward_amount: u256,
+//     new_distribution_type: PrizeDistribution,
+//     new_number_of_winners: u8,
+//     new_prize_percentage: Array<u8>,
+//     new_min_players: u32,
+// ) {
+//     let mut world = self.world_default();
+
+//     // Read existing quiz
+//     let mut quiz: Quiz = world.read_model(quiz_id);
+
+//     // Validate new reward settings
+//     if new_distribution_type == PrizeDistribution::Custom {
+//         let mut total_percentage: u8 = 0;
+//         let mut i = 0;
+//         while i < new_prize_percentage.len() {
+//             total_percentage += *new_prize_percentage.at(i);
+//             i += 1;
+//         };
+
+//         assert!(total_percentage == 100, "Custom distribution must sum to 100%");
+//     }
+
+//     // Construct new RewardSettings
+//     let new_reward_settings = RewardSettings {
+//         has_rewards: true,
+//         token_address: new_token_address,
+//         reward_amount: new_reward_amount,
+//         distribution_type: new_distribution_type,
+//         number_of_winners: new_number_of_winners,
+//         prize_percentage: new_prize_percentage,
+//         min_players: new_min_players,
+//     };
+
+//     // Apply changes
+//     quiz.reward_settings = new_reward_settings;
+
+//     // Write updated quiz back to the world
+//     world.write_model(@quiz);
+// }
