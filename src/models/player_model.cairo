@@ -1,4 +1,4 @@
-use starknet::ContractAddress;
+use starknet::{ContractAddress};
 
 // Enhanced Achievement System
 #[derive(Copy, Drop, Serde, Debug, Introspect)]
@@ -28,7 +28,7 @@ pub enum AchievementType {
 pub enum PlayerQuizCreationStatus {
     Active,
     Ended,
-    Archived,                           // Soft delete for historical data
+    Archived,                          
 }
 
 #[derive(Copy, Drop, Serde, Debug, Introspect)]
@@ -57,8 +57,7 @@ pub struct PlayerCounter {
     pub current_val: u256,
 }
 
-// Enhanced Player model with better stats tracking
-#[derive(Clone, Drop, Serde, Debug)]
+#[derive(Clone, Drop, Serde, Debug, Introspect)]
 #[dojo::model]
 pub struct Player {
     #[key]
@@ -83,84 +82,114 @@ pub struct Player {
     pub favorite_category: felt252,         // Most played category
     pub games_created: u32,                 // Number of quizzes created
     pub is_active: bool,                    // Account status
-    pub referral_code: felt252,             // For referral system
-    pub referred_by: ContractAddress,       // Who referred this player
+    
+    // Creator-specific fields (optional, only populated if player creates quizzes)
+    pub creator_profile: Option<CreatorProfile>,
 }
 
-// Enhanced PlayerAnswer with more granular data
-#[derive(Copy, Drop, Serde, Debug)]
-#[dojo::model]
-pub struct PlayerAnswer {
-    #[key]
-    pub game_id: felt252,
-    #[key]
-    pub player: ContractAddress,
-    #[key]
-    pub question_index: u8,
-    pub selected_option: u8,
-    pub time_taken: u16,                    // Increased from u8 for more precision
-    pub points_earned: u16,
-    pub is_correct: bool,
-    pub difficulty: QuizDifficulty,         // Question difficulty
-    pub category: felt252,                  // Question category
-    pub answered_at: u64,                   // Timestamp when answered
-}
-
-// Improved PlayerResult with better reward tracking
+// Creator profile struct that gets embedded in Player
 #[derive(Copy, Drop, Serde, Debug, Introspect)]
-#[dojo::model]
-pub struct PlayerResult {
-    #[key]
-    pub game_id: felt252,
-    #[key]
-    pub player: ContractAddress,
-    pub total_score: u32,
-    pub correct_answers: u8,
-    pub total_questions: u8,                // For accuracy calculation
-    pub rank: u8,
-    pub reward_amount: u256,
-    pub reward_claimed: bool,
-    pub bonus_points: u16,
-    pub completion_time: u64,               // Total time to complete quiz
-    pub perfect_score: bool,                // Whether player got 100%
-    pub speed_bonus: u256,                  // Bonus for fast completion
-    pub accuracy_bonus: u256,               // Bonus for high accuracy
-    pub game_completed_at: u64,             // When game was finished
+pub struct CreatorProfile {
+    pub creator_since: u64,                 // When they created their first quiz
+    pub verified: bool,                     // Creator verification status
+    pub verification_level: CreatorTier,    // Bronze, Silver, Gold, Platinum
+    pub total_quiz_plays: u64,              // Sum of all plays across all quizzes
+    pub total_creator_earnings: u256,       // Total earnings from quiz creation
+    pub average_quiz_rating: u32,           // Average rating across all quizzes (scaled by 100)
+    pub total_quiz_ratings: u32,
+    pub featured_quizzes: u32,              // Number of featured quizzes
+    pub monthly_quiz_limit: u32,            // Quiz creation limit per month
+    pub quizzes_created_this_month: u32,
+    pub creator_rank: u32,                  // Global creator ranking
+    pub specialization_category: felt252,   // Main category they create for
+    pub creator_badge: felt252,             // Special badge/title
+    pub follower_count: u32,                // If you have a follow system
+    pub total_player_hours: u64,            // Total hours players spent on their quizzes
+    pub quality_score: u32,                 // Algorithm-based quality score
+    pub last_quiz_created: u64,
+    pub creator_achievements: u32,          // Number of creator-specific achievements
 }
 
-// Enhanced Achievement tracking with progress
+// Creator tier enum
+#[derive(Copy, Drop, Serde, Debug, Introspect)]
+pub enum CreatorTier {
+    Unverified,
+    Bronze,
+    Silver, 
+    Gold,
+    Platinum,
+    Diamond,
+}
+
+// Enhanced PlayerAchievement to handle both player and creator achievements
 #[derive(Copy, Drop, Serde, Debug)]
 #[dojo::model]
 pub struct PlayerAchievement {
     #[key]
     pub player: ContractAddress,
     #[key]
-    pub achievement_type: AchievementType,  // Use enum instead of felt252
+    pub achievement_type: AchievementType,  // Now includes creator achievements
     pub earned_at: u64,
     pub progress: u32,
     pub target: u32,                        // Target value for achievement
     pub completed: bool,
     pub reward_claimed: bool,               // Whether reward was claimed
     pub reward_amount: u256,                // Reward for this achievement
+    pub is_creator_achievement: bool,       // Flag to distinguish achievement types
 }
 
-// Enhanced reward system
-#[derive(Copy, Drop, Serde, Debug)]
-#[dojo::model]
-pub struct PlayerPendingReward {
-    #[key]
-    pub player: ContractAddress,
-    #[key]
-    pub game_id: felt252,
-    pub reward_amount: u256,
-    pub token_address: ContractAddress,
-    pub created_at: u64,                    // When reward was earned
-    pub expires_at: u64,                    // Expiration time for claiming
-    pub reward_type: felt252,               // Type of reward (game_win, achievement, etc.)
-}
+// pub trait PlayerTrait{
+//     fn initialize_creator_profile(ref self: ContractState, current_time: u64);
+//     fn is_creator(self: @ContractState) -> bool;
+//     fn get_creator_profile(self: @ContractState) -> Option<CreatorProfile>;
+    
+// }
 
-// Enhanced quiz creation tracking
-#[derive(Copy, Drop, Serde, Debug)]
+// impl PlayerImpl of PlayerTrait {
+//     // Initialize creator profile when player creates their first quiz
+//     fn initialize_creator_profile(ref self: ContractState, current_time: u64) {
+//         if self.creator_profile.is_none() {
+//             self.creator_profile = Option::Some(CreatorProfile {
+//                 creator_since: current_time,
+//                 verified: false,
+//                 verification_level: CreatorTier::Unverified,
+//                 total_quiz_plays: 0,
+//                 total_creator_earnings: 0,
+//                 average_quiz_rating: 0,
+//                 total_quiz_ratings: 0,
+//                 featured_quizzes: 0,
+//                 monthly_quiz_limit: 10, // Default limit
+//                 quizzes_created_this_month: 0,
+//                 creator_rank: 0,
+//                 specialization_category: 0,
+//                 creator_badge: 0,
+//                 follower_count: 0,
+//                 total_player_hours: 0,
+//                 quality_score: 0,
+//                 last_quiz_created: current_time,
+//                 creator_achievements: 0,
+//             });
+//         }
+
+//     }
+    
+//     // Check if player is a creator
+//     fn is_creator(self: @ContractState) -> bool {
+//         if self.creator_profile{
+//             true
+//         }else{
+//             false
+//         }
+//     }
+    
+//     // Get creator profile reference
+//     fn get_creator_profile(self: @ContractState) -> Option<CreatorProfile> {
+//         self.creator_profile
+//     }
+// }
+
+// Enhanced PlayerQuizCreation remains the same but now works with creator profile
+#[derive(Copy, Drop, Serde, Debug, Introspect)]
 #[dojo::model]
 pub struct PlayerQuizCreation {
     #[key]
@@ -184,70 +213,3 @@ pub struct PlayerQuizCreation {
     pub rating: u8,                         // User rating out of 5
     pub total_ratings: u32,                 // Number of ratings received
 }
-
-// New model for tracking player statistics over time
-#[derive(Copy, Drop, Serde, Debug)]
-#[dojo::model] 
-pub struct PlayerStatistics {
-    #[key]
-    pub player: ContractAddress,
-    #[key]
-    pub period: felt252,                    // daily, weekly, monthly
-    #[key]
-    pub timestamp: u64,                     // Period start timestamp
-    pub games_played: u32,
-    pub games_won: u32,
-    pub total_score: u64,
-    pub total_time_played: u64,
-    pub average_answer_time: u32,
-    pub earnings: u256,
-    pub achievements_earned: u32,
-}
-
-// New model for leaderboards
-#[derive(Copy, Drop, Serde, Debug)]
-#[dojo::model]
-pub struct PlayerLeaderboard {
-    #[key]
-    pub leaderboard_type: felt252,          // weekly, monthly, all_time, category
-    #[key]
-    pub player: ContractAddress,
-    pub rank: u32,
-    pub score: u64,
-    pub last_updated: u64,
-    pub tier: PlayerTier,
-}
-
-// Enhanced reward history
-#[derive(Copy, Drop, Serde, Debug)]
-#[dojo::model]
-pub struct PlayerRewardHistory {
-    #[key]
-    pub player: ContractAddress,
-    #[key]
-    pub reward_id: felt252,
-    pub quiz_title: ByteArray,
-    pub game_id: felt252,
-    pub reward_amount: u256,
-    pub token_address: ContractAddress,
-    pub earned_at: u64,
-    pub claimed_at: u64,
-    pub transaction_hash: felt252,          // Transaction hash instead of URL
-    pub reward_type: felt252,               // game_win, achievement, referral, etc.
-}
-
-// New model for player sessions
-#[derive(Copy, Drop, Serde, Debug)]
-#[dojo::model]
-pub struct PlayerSession {
-    #[key]
-    pub player: ContractAddress,
-    #[key]
-    pub session_id: felt252,
-    pub started_at: u64,
-    pub ended_at: u64,
-    pub games_played: u32,
-    pub total_score: u64,
-    pub total_earnings: u256,
-}
-

@@ -68,83 +68,9 @@ mod tests {
         ]
             .span()
     }
-
-    // === Test create_quiz ===
-    // #[test]
-    // fn test_create_quiz() {
-    //     // Initialize test environment
-    //     let caller_1 = contract_address_const::<'Akos'>();
-    //     let ndef = namespace_def();
-
-    //     // Register the resources.
-    //     let mut world = spawn_test_world([ndef].span());
-
-    //     // Ensures permissions and initializations are synced.
-    //     world.sync_perms_and_inits(contract_defs());
-
-    //     let (contract_address, _) = world.dns(@"ZappQuiz").unwrap();
-    //     let actions_system = IZappQuizDispatcher { contract_address };
-
-    //     testing::set_contract_address(caller_1);
-
-    //     // Declare test data
-    //     let title: ByteArray = "Zero sum game";
-    //     let description: ByteArray = "When you finally get it your name would be written in the stars"; 
-    //     let category: ByteArray = "Maths";
-
-    //     let mut options = ArrayTrait::new();
-    //     options.append("true");
-    //     options.append("false");
-
-    //     let question = QuestionTrait::new(
-    //         25, 
-    //         "What is 2 + 2 = 4?",
-    //         QuestionType::TrueFalse,
-    //         options,
-    //         0,
-    //         30_u8,
-    //         10_u8,  
-    //         10_u16,
-    //     );
-
-    //     let dummy_questions: Array<Question> = array![question];
-        
-    //     let reward_settings = RewardSettings {
-    //         has_rewards: true,
-    //         token_address: contract_address_const::<'Akos'>(),
-    //         reward_amount: 1000000000000000000,
-    //         distribution_type: PrizeDistribution::Custom,
-    //         number_of_winners: 2,
-    //         prize_percentage: array![50, 30, 20],
-    //         min_players: 2,
-    //     };
-
-    //     // Create quiz
-    //     let quiz = actions_system.create_quiz(
-    //         title.clone(),
-    //         description.clone(),
-    //         category.clone(),
-    //         dummy_questions.clone(),
-    //         public: true,
-    //         default_duration: 3000,
-    //         default_max_points: 1000,
-    //         custom_timing: true,
-    //         creator: caller_1,
-    //         reward_settings: reward_settings.clone(),
-    //     );
-
-    //     // Basic assertions to verify quiz creation
-    //     assert(quiz.title == title, 'Quiz title mismatch');
-    //     assert(quiz.creator == caller_1, 'Quiz creator mismatch');
-    //     assert(quiz.id == 1, 'Quiz ID should be 1');
-    //     assert!(quiz.is_active == false, "Quiz should be inactive initially");
-        
-    //     println!("Quiz created successfully with ID: {}", quiz.id);
-    // }
-
-    // Simple test to check if the contract is properly initialized
+    
     #[test]
-    fn test_contract_initialization() {
+    fn test_create_quiz() {
         let ndef = namespace_def();
         let mut world = spawn_test_world([ndef].span());
         world.sync_perms_and_inits(contract_defs());
@@ -156,12 +82,41 @@ mod tests {
         let caller = contract_address_const::<'TestUser'>();
         testing::set_contract_address(caller);
         
-        let quiz_id = actions_system.create_new_quiz_id();
-        assert(quiz_id == 1, 'First quiz ID should be 1');
+        // let quiz_id = actions_system.create_new_quiz_id();
+        // assert(quiz_id == 1, 'First quiz ID should be 1');
         
-        let quiz_id_2 = actions_system.create_new_quiz_id();
-        assert(quiz_id_2 == 2, 'Second quiz ID should be 2');
+        // let quiz_id_2 = actions_system.create_new_quiz_id();
+        // assert(quiz_id_2 == 2, 'Second quiz ID should be 2');
+
+        // let reward_settings = RewardSettings {
+        //     has_rewards: true,
+        //     token_address: contract_address_const::<'Akos'>(),
+        //     reward_amount: 2000,
+        //     distribution_type: PrizeDistribution::WinnerTakesAll,
+        //     number_of_winners: 1,
+        //     prize_percentage: ArrayTrait::new(),
+        //     min_players: 3,
+        // };
         
-        println!("Contract initialization test passed");
+        let quiz_id = actions_system.create_quiz("Bitcoiners", "Quiz on the history of bitcoin", "History", false, 100000, 10, false, caller, 2000, true, PrizeDistribution::WinnerTakesAll, 1, ArrayTrait::new(), 3);
+
+        let quiz = actions_system.get_quiz(quiz_id);
+
+        assert!(quiz.quiz_details.quiz_title == "Bitcoiners", "Quiz title should be Bitcoiners");
+        assert!(quiz.quiz_details.description == "Quiz on the history of bitcoin", "Quiz description should be Quiz on the history of bitcoin");
+        assert!(quiz.quiz_details.category == "History", "Quiz category should be History");
+        assert!(quiz.quiz_details.visibility == false, "Quiz visibility should be false");
+        assert!(quiz.default_duration == 100000, "Quiz default duration should be 100000");
+        assert!(quiz.default_max_points == 10, "Quiz default max points should be 10");
+        assert!(quiz.custom_timing == false, "Quiz custom timing should be false");
+        assert!(quiz.creator == caller, "Quiz creator should be TestUser");
+        assert!(quiz.reward_settings.has_rewards == true, "Quiz has rewards should be true");
+        assert!(quiz.reward_settings.token_address == contract_address_const::<'Akos'>(), "Quiz token address should be Akos");
+        assert!(quiz.reward_settings.reward_amount == 2000, "Quiz reward amount should be 2000");
+        assert!(quiz.reward_settings.distribution_type == PrizeDistribution::WinnerTakesAll, "Quiz distribution type should be WinnerTakesAll");
+        assert!(quiz.reward_settings.number_of_winners == 1, "Quiz number of winners should be 1");
+        assert!(quiz.reward_settings.prize_percentage.len() == 0, "Quiz prize percentage should be empty");
+        assert(quiz.reward_settings.min_players == 3, 'Quiz min players should be 3');
+        
     }
 }
