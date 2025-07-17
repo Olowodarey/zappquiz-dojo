@@ -1,6 +1,6 @@
 #[derive(Copy, Drop, Introspect, Serde, Debug, PartialEq)]
 pub enum QuestionType {
-    multichoice,
+    Multichoice,
     TrueFalse,
 }
 
@@ -60,7 +60,7 @@ pub impl QuestionImpl of QuestionTrait {
             let question = QuestionTrait::new(
                 1,
                 "What is the capital of France?",
-                QuestionType::multichoice,
+                QuestionType::Multichoice,
                 options,
                 0,
                 100000,
@@ -69,7 +69,7 @@ pub impl QuestionImpl of QuestionTrait {
             );
             assert_eq!(question.id, 1);
             assert_eq!(question.text, "What is the capital of France?");
-            assert_eq!(question.question_type, QuestionType::multichoice);
+            assert_eq!(question.question_type, QuestionType::Multichoice);
             assert!(question.options.len() == 4, "Options length should be 4");
             assert_eq!(question.correct_option, 0);
             assert_eq!(question.duration_seconds, 100000);

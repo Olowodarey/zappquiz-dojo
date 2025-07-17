@@ -1,4 +1,4 @@
-use zapp_quiz::models::question_model::QuestionType;
+use zapp_quiz::models::question_model::Question;
 use zapp_quiz::models::quiz_model::Quiz;
 use zapp_quiz::models::quiz_model::PrizeDistribution;
 use starknet::ContractAddress;
@@ -16,36 +16,40 @@ pub trait IZappQuiz<T> {
     custom_timing: bool,
     creator: ContractAddress,
     // reward_settings: RewardSettings,
+    questions: Array<Question>,
     amount: u256,
     has_rewards: bool,
     distribution_type: PrizeDistribution,
     number_of_winners: u8,
     prize_percentage: Array<u8>,
     min_players: u32,
+    token_address: ContractAddress
     ) -> u256;
 
+    fn create_game_session(
+        ref self: T,
+        quiz_id: u256,
+        max_players: u32,
+    ) -> u256;
+
+    fn join_game_session(
+        ref self: T,
+        session_id: u256,
+        player: ContractAddress
+    );
+
+    fn start_game_session(
+        ref self: T,
+        session_id: u256,
+    );
+
+    fn next_question(
+            ref self: T,
+            session_id: u256);
+
     fn get_quiz(self: @T, quiz_id: u256) -> Quiz;
-
-    fn add_question_to_quiz(
-        ref self: T,
-        quiz_id: u256,
-        text: ByteArray,
-        question_type: QuestionType,
-        options: Array<ByteArray>,
-        correct_option: u8,
-        duration_seconds: u256,
-        point: u256,
-        max_points: u256,
-    ) -> bool ;
-
-    fn remove_question_from_quiz(
-        ref self: T,
-        quiz_id: u256,
-        question_index: u32,
-    ) -> bool;
-
     fn create_new_quiz_id(ref self: T,) -> u256;
-
     fn create_new_question_id(ref self: T,) -> u256;
+    fn create_new_game_id(ref self: T,) -> u256;
 
 }

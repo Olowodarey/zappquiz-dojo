@@ -4,7 +4,8 @@ pub mod ZappQuiz {
     use zapp_quiz::models::quiz_model::{RewardSettings, PrizeDistribution, Quiz, QuizCounter, QuizDetails};
     use zapp_quiz::models::analytics_model::{CreatorStats, PlatformStats};
     use zapp_quiz::models::system_model::{PlatformConfig};
-    use zapp_quiz::models::question_model::{QuestionTrait, QuestionType, QuestionCounter};
+    use zapp_quiz::models::question_model::{QuestionCounter, Question};
+    use zapp_quiz::models::game_model::{GameStatus, GameSession, GameSessionCounter};
    
 
     use starknet::{ContractAddress, get_caller_address, get_block_timestamp, contract_address_const};
@@ -45,6 +46,21 @@ pub mod ZappQuiz {
         pub creator: ContractAddress,
     }
 
+    #[derive(Clone, Drop, Serde, Debug)]
+    #[dojo::event]
+    pub struct PlayerJoined {
+        #[key]
+        pub session_id: u256,
+        #[key]
+        pub player: ContractAddress,
+    }
+
+    #[derive(Clone, Drop, Serde, Debug)]
+    #[dojo::event]
+    pub struct GameStarted {
+        #[key]
+        pub session_id: u256,
+    }
 
     #[abi(embed_v0)]
     pub impl ZappQuizImpl of IZappQuiz<ContractState> {
@@ -67,6 +83,15 @@ pub mod ZappQuiz {
             new_val
         }
 
+        fn create_new_game_id(ref self: ContractState) -> u256{
+            let mut world = self.world_default();
+            let mut game_counter: GameSessionCounter = world.read_model('v0');
+            let new_val = game_counter.current_val + 1;
+            game_counter.current_val = new_val;
+            world.write_model(@game_counter);
+            new_val
+        }
+
         fn create_quiz(
             ref self: ContractState,
             title: ByteArray,
@@ -78,12 +103,14 @@ pub mod ZappQuiz {
             custom_timing: bool,
             creator: ContractAddress,
             // reward_settings: RewardSettings,
+            questions: Array<Question>,
             amount: u256,
             has_rewards: bool,
             distribution_type: PrizeDistribution,
             number_of_winners: u8,
             prize_percentage: Array<u8>,
             min_players: u32,
+            token_address: ContractAddress,
         ) -> u256 {
             let mut world = self.world_default();
             let caller = get_caller_address();
@@ -101,7 +128,7 @@ pub mod ZappQuiz {
 
             let reward_settings = RewardSettings {
                 has_rewards: has_rewards,
-                token_address: contract_address_const::<'Akos'>(),
+                token_address: token_address,
                 reward_amount: amount,
                 distribution_type: distribution_type,
                 number_of_winners: number_of_winners,
@@ -166,7 +193,7 @@ pub mod ZappQuiz {
             let mut quiz: Quiz = Quiz {
                 id: quiz_id,
                 quiz_details,
-                questions: ArrayTrait::new(), // Start with empty questions array
+                questions,
                 default_duration,
                 default_max_points,
                 custom_timing,
@@ -197,104 +224,79 @@ pub mod ZappQuiz {
             quiz
         }
 
-        fn add_question_to_quiz(
+        fn create_game_session(
             ref self: ContractState,
             quiz_id: u256,
-            text: ByteArray,
-            question_type: QuestionType,
-            options: Array<ByteArray>,
-            correct_option: u8,
-            duration_seconds: u256,
-            point: u256,
-            max_points: u256,
-        ) -> bool {
+            max_players: u32,
+        ) -> u256 {
             let mut world = self.world_default();
-            let caller = get_caller_address();
-            
-            // Get the quiz
-            let mut quiz: Quiz = world.read_model(quiz_id);
-            
-            assert!(quiz.creator == caller, "Only quiz creator can add questions");
-            assert!(!quiz.is_active, "Cannot add questions to active quiz");
-            assert!(text.len() > 0, "Question text cannot be empty");
-            assert!(options.len() >= 2, "Question must have at least 2 options");
-            assert!(options.len() <= 10, "Question cannot have more than 10 options");
-            // assert!(correct_option < options.len(), "Invalid correct option index");
-            assert!(point > 0, "Question points must be greater than 0");
-            assert!(max_points >= point, "Max points must be >= question points");
-            assert!(duration_seconds > 0, "Question duration must be greater than 0");
-            assert!(quiz.questions.len() < 50, "Quiz cannot have more than 50 questions");
-            
-            // Create question ID based on quiz and current question count
-            let question_id = self.create_new_question_id();
-            
-            // Create the question
-            let new_question = QuestionTrait::new(question_id, text.clone(), question_type, options, correct_option, duration_seconds, point, max_points);
-            
-            // Add question to quiz
-            quiz.questions.append(new_question);
-            
-            // Update quiz
-            world.write_model(@quiz);
-            
-            // Emit event
-            world.emit_event(@QuestionAddedToQuiz { 
-                quiz_id, 
-                question_id, 
-                text: text,
-                creator: caller 
-            });
-            
-            true
-        }
-        
-        fn remove_question_from_quiz(
-            ref self: ContractState,
-            quiz_id: u256,
-            question_index: u32,
-        ) -> bool {
-            let mut world = self.world_default();
-            let caller = get_caller_address();
-            
-            // Get the quiz
-            let mut quiz: Quiz = world.read_model(quiz_id);
-            
-            // Validate permissions
-            assert!(quiz.creator == caller, "Only quiz creator can remove questions");
-            assert!(!quiz.is_active, "Cannot modify active quiz");
-            
-            // Validate index
-            assert!(question_index < quiz.questions.len(), "Invalid question index");
-            
-            // Create new questions array without the specified question
-            let mut new_questions = ArrayTrait::new();
-            
-            let mut i = 0;
-            while i < quiz.questions.len() {
-                if i != question_index {
-                    let mut question = quiz.questions.at(i).clone();
-                    // Update question ID to maintain sequence
-                    if i > question_index {
-                        question.id = question.id - 1;
-                    }
-                    new_questions.append(question);
-                }
-                i += 1;
+            let host = get_caller_address();
+            let timestamp = get_block_timestamp();
+
+
+            let session_id = self.create_new_game_id();
+            let mut game: GameSession = GameSession {
+                id: session_id,
+                quiz_id,
+                host,
+                status: GameStatus::Waiting,
+                players: ArrayTrait::new(),
+                total_players: 0,
+                max_players,
+                current_question: 0,
+                reward_distributed: false,
+                started_at: 0,
+                ended_at: 0,
+                total_reward_pool: 0,
+                platform_fees_collected: 0,
+                created_at: timestamp,
             };
-            
-            // Update quiz with new questions array
-            quiz.questions = new_questions;
-        
-            world.write_model(@quiz);
-    
-            world.emit_event(@QuestionRemovedFromQuiz { 
-                quiz_id, 
-                question_index, 
-                creator: caller 
-            });
-            
-            true
+            world.write_model(@game);
+            session_id
         }
+
+        fn join_game_session(ref self: ContractState, session_id: u256, player: ContractAddress) {
+            let world = self.world_default();
+            let mut session: GameSession = world.read_model(session_id);
+
+            // Validate Session
+            assert!(session.status == GameStatus::Waiting, "Game has already started");
+            assert!(session.total_players < session.max_players, "Game is full");
+
+            // Add player
+            session.players.append(player);
+            world.write_model(@session);
+
+            // Emit event
+            world.emit_event(@PlayerJoined { session_id, player });
+
+        }
+
+        fn start_game_session(ref self: ContractState, session_id: u256) {
+            let world = self.world_default();
+            let mut session: GameSession = world.read_model(session_id);
+
+            // Only host can start the game 
+            assert!(session.host == get_caller_address(), "Only host can start the game");
+            assert!(session.status == GameStatus::Waiting, "Game not in waiting state");
+
+            // Start the game
+            session.status = GameStatus::Active;
+            session.started_at = get_block_timestamp();
+            session.current_question = 1;
+            
+            world.write_model(@session);
+            
+            // Emit event to notify all players
+            world.emit_event(@GameStarted { session_id });
+            
+        }
+     
+        // fn next_question(ref self: ContractState, session_id: u256) {   
+        //     let mut session = world.read_model(session_id);
+
+        //     // o
+        // }
     }
 
 

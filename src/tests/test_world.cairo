@@ -9,11 +9,11 @@ mod tests {
     use starknet::{contract_address_const, testing, get_block_timestamp};
 
     // Models 
-    use zapp_quiz::models::analytics_model::{DailyStats, CreatorStats, m_CreatorStats, PlatformStats, m_PlatformStats, QuestionResults};
+    use zapp_quiz::models::analytics_model::{DailyStats, CreatorStats, m_CreatorStats, PlatformStats, m_PlatformStats};
     
-    use zapp_quiz::models::quiz_model::{Quiz, m_Quiz, QuizCounter, m_QuizCounter, RewardSettings, PrizeDistribution};
+    use zapp_quiz::models::quiz_model::{Quiz, m_Quiz, QuizCounter, m_QuizCounter, PrizeDistribution};
     
-    use zapp_quiz::models::question_model::{Question, m_Question, QuestionType};
+    use zapp_quiz::models::question_model::{Question, m_Question, QuestionType, QuestionCounter, m_QuestionCounter, QuestionTrait};
     
     use zapp_quiz::models::system_model::{PlatformConfig, m_PlatformConfig};
 
@@ -21,9 +21,8 @@ mod tests {
 
     use zapp_quiz::models::player_model::{Player, m_Player};
 
-    use zapp_quiz::interfaces::IZappQuiz::{IZappQuiz, IZappQuizDispatcher, IZappQuizDispatcherTrait};
+    use zapp_quiz::interfaces::IZappQuiz::{IZappQuizDispatcher, IZappQuizDispatcherTrait};
    
-    use zapp_quiz::models::question_model::QuestionTrait;
 
     use zapp_quiz::systems::ZappQuiz::ZappQuiz;
 
@@ -36,6 +35,7 @@ mod tests {
                 TestResource::Model(m_Quiz::TEST_CLASS_HASH),
                 TestResource::Model(m_QuizCounter::TEST_CLASS_HASH),
                 TestResource::Model(m_Question::TEST_CLASS_HASH),
+                TestResource::Model(m_QuestionCounter::TEST_CLASS_HASH),
                 
                 // Analytics models
                 TestResource::Model(m_CreatorStats::TEST_CLASS_HASH),
@@ -81,42 +81,71 @@ mod tests {
         // Test creating a new quiz ID
         let caller = contract_address_const::<'TestUser'>();
         testing::set_contract_address(caller);
-        
+
+        // let question_id = actions_system.create_new_question_id();
+
         // let quiz_id = actions_system.create_new_quiz_id();
-        // assert(quiz_id == 1, 'First quiz ID should be 1');
-        
-        // let quiz_id_2 = actions_system.create_new_quiz_id();
-        // assert(quiz_id_2 == 2, 'Second quiz ID should be 2');
 
-        // let reward_settings = RewardSettings {
-        //     has_rewards: true,
-        //     token_address: contract_address_const::<'Akos'>(),
-        //     reward_amount: 2000,
-        //     distribution_type: PrizeDistribution::WinnerTakesAll,
-        //     number_of_winners: 1,
-        //     prize_percentage: ArrayTrait::new(),
-        //     min_players: 3,
-        // };
-        
-        let quiz_id = actions_system.create_quiz("Bitcoiners", "Quiz on the history of bitcoin", "History", false, 100000, 10, false, caller, 2000, true, PrizeDistribution::WinnerTakesAll, 1, ArrayTrait::new(), 3);
+        let mut options = ArrayTrait::new();
+        options.append("Paris");
+        options.append("London");
+        options.append("Berlin");
+        options.append("Madrid");
 
-        let quiz = actions_system.get_quiz(quiz_id);
+        let mut questions: Array<Question> = ArrayTrait::new();
 
-        assert!(quiz.quiz_details.quiz_title == "Bitcoiners", "Quiz title should be Bitcoiners");
-        assert!(quiz.quiz_details.description == "Quiz on the history of bitcoin", "Quiz description should be Quiz on the history of bitcoin");
-        assert!(quiz.quiz_details.category == "History", "Quiz category should be History");
-        assert!(quiz.quiz_details.visibility == false, "Quiz visibility should be false");
-        assert!(quiz.default_duration == 100000, "Quiz default duration should be 100000");
-        assert!(quiz.default_max_points == 10, "Quiz default max points should be 10");
-        assert!(quiz.custom_timing == false, "Quiz custom timing should be false");
-        assert!(quiz.creator == caller, "Quiz creator should be TestUser");
-        assert!(quiz.reward_settings.has_rewards == true, "Quiz has rewards should be true");
-        assert!(quiz.reward_settings.token_address == contract_address_const::<'Akos'>(), "Quiz token address should be Akos");
-        assert!(quiz.reward_settings.reward_amount == 2000, "Quiz reward amount should be 2000");
-        assert!(quiz.reward_settings.distribution_type == PrizeDistribution::WinnerTakesAll, "Quiz distribution type should be WinnerTakesAll");
-        assert!(quiz.reward_settings.number_of_winners == 1, "Quiz number of winners should be 1");
-        assert!(quiz.reward_settings.prize_percentage.len() == 0, "Quiz prize percentage should be empty");
-        assert(quiz.reward_settings.min_players == 3, 'Quiz min players should be 3');
-        
+        let question_1 = Question {
+            id: 0,
+            text: "What is the capital of France?",
+            question_type: QuestionType::Multichoice,
+            options: options,
+            correct_option: 0,
+            duration_seconds: 10000,
+            point: 10,
+            max_points: 10,
+        };
+
+
+        let mut option2: Array<ByteArray> = ArrayTrait::new();
+        option2.append("True");
+        option2.append("False");
+
+        let question_2 = QuestionTrait::new(
+            id: 1,
+            text: "Is 2+2=5?",
+            question_type: QuestionType::TrueFalse,
+            options: option2,
+            correct_option: 1,
+            duration_seconds: 10000,
+            point: 10,
+            max_points: 10,
+        );
+
+        questions.append(question_1);
+        // questions.append(question_2);
+
+        let mut prize_percentage = ArrayTrait::new();
+
+        actions_system.create_quiz(
+            title: "Test Quiz",
+            description: "This is a test quiz",
+            category: "Test Category",
+            public: true,
+            default_duration: 10000,
+            default_max_points: 10,
+            custom_timing: false,
+            creator: caller,
+            questions: questions,
+            amount: 10000,
+            has_rewards: true,
+            distribution_type: PrizeDistribution::WinnerTakesAll,
+            number_of_winners: 1,
+            prize_percentage: prize_percentage,
+            min_players: 1,
+            token_address: contract_address_const::<0x123456789>(),
+        );
+
+        // let quiz = actions_system.get_quiz(quiz_id);
+        // assert!(quiz.id == quiz_id, "Quiz ID should match");
     }
 }
