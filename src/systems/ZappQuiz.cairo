@@ -5,9 +5,8 @@ pub mod ZappQuiz {
     use zapp_quiz::models::analytics_model::{CreatorStats, PlatformStats};
     use zapp_quiz::models::system_model::{PlatformConfig};
     use zapp_quiz::models::question_model::{QuestionCounter, Question};
-    use zapp_quiz::models::game_model::{GameStatus, GameSession, GameSessionCounter};
+    use zapp_quiz::models::game_model::{GameStatus, GameSession, GameSessionCounter, LivePlayerState, PlayerAnswer};
    
-
     use starknet::{ContractAddress, get_caller_address, get_block_timestamp, contract_address_const};
 
     use zapp_quiz::interfaces::IZappQuiz::{IZappQuiz};
@@ -51,7 +50,6 @@ pub mod ZappQuiz {
     pub struct PlayerJoined {
         #[key]
         pub session_id: u256,
-        #[key]
         pub player: ContractAddress,
     }
 
@@ -60,6 +58,26 @@ pub mod ZappQuiz {
     pub struct GameStarted {
         #[key]
         pub session_id: u256,
+        pub question_start_time: u64,
+    }
+
+    #[derive(Clone, Drop, Serde, Debug)]
+    #[dojo::event]
+    pub struct QuestionChanged {
+        #[key]
+        pub session_id: u256,
+        pub question_num: u32,
+        pub question_start_time: u64,
+    }
+
+    #[derive(Clone, Drop, Serde, Debug)]
+    #[dojo::event]
+    pub struct AnswerSubmitted {
+        #[key]
+        pub session_id: u256,
+        pub question_num: u32,
+        pub answer: u8,
+        pub points: u256,
     }
 
     #[abi(embed_v0)]
@@ -233,7 +251,6 @@ pub mod ZappQuiz {
             let host = get_caller_address();
             let timestamp = get_block_timestamp();
 
-
             let session_id = self.create_new_game_id();
             let mut game: GameSession = GameSession {
                 id: session_id,
@@ -247,6 +264,7 @@ pub mod ZappQuiz {
                 reward_distributed: false,
                 started_at: 0,
                 ended_at: 0,
+                question_start_time: 0,
                 total_reward_pool: 0,
                 platform_fees_collected: 0,
                 created_at: timestamp,
@@ -256,7 +274,7 @@ pub mod ZappQuiz {
         }
 
         fn join_game_session(ref self: ContractState, session_id: u256, player: ContractAddress) {
-            let world = self.world_default();
+            let mut world = self.world_default();
             let mut session: GameSession = world.read_model(session_id);
 
             // Validate Session
@@ -273,12 +291,12 @@ pub mod ZappQuiz {
         }
 
         fn start_game_session(ref self: ContractState, session_id: u256) {
-            let world = self.world_default();
+            let mut world = self.world_default();
             let mut session: GameSession = world.read_model(session_id);
 
             // Only host can start the game 
             assert!(session.host == get_caller_address(), "Only host can start the game");
-            assert!(session.status == GameStatus::Waiting, "Game not in waiting state");
+            assert!(session.status == GameStatus::Waiting, "Game has already started");
 
             // Start the game
             session.status = GameStatus::Active;
@@ -288,17 +306,59 @@ pub mod ZappQuiz {
             world.write_model(@session);
             
             // Emit event to notify all players
-            world.emit_event(@GameStarted { session_id });
+            world.emit_event(@GameStarted { session_id, question_start_time: session.question_start_time });
             
         }
      
-        // fn next_question(ref self: ContractState, session_id: u256) {   
-        //     let mut session = world.read_model(session_id);
+        fn next_question(ref self: ContractState, session_id: u256) {   
+             let mut world = self.world_default();
+             let mut session: GameSession = world.read_model(session_id);
 
-        //     // o
-        // }
+            //  assert!(session.host == get_caller_address(), "Only host can advance");
+
+             let quiz: Quiz = world.read_model(session.quiz_id);
+
+            if session.current_question >= quiz.questions.len() {
+                session.status = GameStatus::Ended;
+                // session.ended_at = get_block_timestamp();
+            } else {
+                session.current_question += 1;
+                session.question_start_time = get_block_timestamp();
+            }
+             
+            world.write_model(@session);
+            
+            // Emit event to notify all players
+            world.emit_event(@QuestionChanged { session_id, question_num: session.current_question, question_start_time: session.question_start_time });
+        }
+
+        fn submit_answer(ref self: ContractState, session_id: u256, question_num:u32, answer: u8) {
+            let mut world = self.world_default();
+            let mut session: GameSession = world.read_model(session_id);
+            let player = get_caller_address();
+    
+            // validate
+            assert!(session.status == GameStatus::Active, "Game is not active");
+            assert!(session.current_question == question_num, "Not the current question");
+           
+            // calculate points based on speed
+            let  points = self.calculate_points(session_id, question_num, player);
+
+            let player_answer = PlayerAnswer{
+                session_id,
+                player,
+                question_num,
+                answer,
+                answered_at: get_block_timestamp(),
+                points_earned: points,
+            };
+
+            world.write_model(@player_answer);
+            world.emit_event(@AnswerSubmitted { session_id, question_num, answer, points });
+        }
     }
-
+   
+        
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
@@ -307,16 +367,26 @@ pub mod ZappQuiz {
             self.world(@"zapp_quiz")
         }
 
+        fn calculate_points(ref self: ContractState, session_id: u256, question_num: u32, player: ContractAddress) -> u256 {
+            let mut world = self.world_default();
+            let session: GameSession = world.read_model(session_id);
+            let quiz: Quiz = world.read_model(session.quiz_id);
+            let mut question: Question = quiz.questions[question_num].clone();
+            let player_state: LivePlayerState = world.read_model(player);
+            let time_taken = get_block_timestamp() - player_state.last_answer_time;
+            let points = question.max_points / time_taken.into();
+            points
+        }
+
         fn _update_creator_stats(
             ref self: ContractState,    
             creator: ContractAddress,
             action_type: felt252 // 'quiz_created', 'game_hosted', etc.
         ) {
-            // Read existing creator stats or create new ones
+          
             let mut world = self.world_default();
             let mut creator_stats: CreatorStats = world.read_model(creator);
 
-            // Initialize if first time (check if creator address is zero)
             if creator_stats.creator == contract_address_const::<0>() {
                 creator_stats = CreatorStats {
                     creator: creator,
@@ -329,7 +399,6 @@ pub mod ZappQuiz {
                 };
             }
 
-            // Update based on action type
             if action_type == 'quiz_created' {
                 creator_stats.total_quizzes_created += 1;
             } else if action_type == 'game_hosted' {
@@ -344,7 +413,6 @@ pub mod ZappQuiz {
         }
 
         fn _initialize_platform_config(ref self: ContractState) {
-            // Initialize default platform configuration if it doesn't exist
             let mut world = self.world_default();
             let mut existing_config: PlatformConfig = world.read_model(1_u8);
 
@@ -352,16 +420,15 @@ pub mod ZappQuiz {
                 let default_config = PlatformConfig {
                     id: 1,
                     platform_fee_percentage: 5,
-                    treasury_address: contract_address_const::<0>(), // Must be set by admin
-                    min_fee_threshold: 1000000000000000000, // 1 token minimum
-                    max_fee_cap: 0, // No cap by default
-                    fee_active: false, // Start with fees disabled
+                    treasury_address: contract_address_const::<0>(), 
+                    min_fee_threshold: 1000000000000000000,
+                    max_fee_cap: 0,
+                    fee_active: false,
                     updated_at: get_block_timestamp(),
                 };
 
                 world.write_model(@default_config);
 
-                // Initialize platform stats
                 let platform_stats = PlatformStats {
                     id: 1,
                     total_games_created: 0,
@@ -377,49 +444,3 @@ pub mod ZappQuiz {
         }
     }    
 }
-
-
-// fn update_quiz_reward_settings(
-//     ref self: ContractState,
-//     quiz_id: u256,
-//     new_token_address: ContractAddress,
-//     new_reward_amount: u256,
-//     new_distribution_type: PrizeDistribution,
-//     new_number_of_winners: u8,
-//     new_prize_percentage: Array<u8>,
-//     new_min_players: u32,
-// ) {
-//     let mut world = self.world_default();
-
-//     // Read existing quiz
-//     let mut quiz: Quiz = world.read_model(quiz_id);
-
-//     // Validate new reward settings
-//     if new_distribution_type == PrizeDistribution::Custom {
-//         let mut total_percentage: u8 = 0;
-//         let mut i = 0;
-//         while i < new_prize_percentage.len() {
-//             total_percentage += *new_prize_percentage.at(i);
-//             i += 1;
-//         };
-
-//         assert!(total_percentage == 100, "Custom distribution must sum to 100%");
-//     }
-
-//     // Construct new RewardSettings
-//     let new_reward_settings = RewardSettings {
-//         has_rewards: true,
-//         token_address: new_token_address,
-//         reward_amount: new_reward_amount,
-//         distribution_type: new_distribution_type,
-//         number_of_winners: new_number_of_winners,
-//         prize_percentage: new_prize_percentage,
-//         min_players: new_min_players,
-//     };
-
-//     // Apply changes
-//     quiz.reward_settings = new_reward_settings;
-
-//     // Write updated quiz back to the world
-//     world.write_model(@quiz);
-// }

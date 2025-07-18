@@ -1,4 +1,4 @@
-use starknet::{ContractAddress};
+use starknet::{ContractAddress, get_block_timestamp};
 
 // Enhanced Achievement System
 #[derive(Copy, Drop, Serde, Debug, Introspect)]
@@ -62,55 +62,53 @@ pub struct PlayerCounter {
 pub struct Player {
     #[key]
     pub address: ContractAddress,
-    pub nickname: felt252, 
-    pub avatar_url: ByteArray,
-    pub created_at: u64,                    // When player joined
+
+    // User Profile
+    pub nickname: ByteArray, 
+    pub avatar_id: u8,
+    pub created_at: u64,     
+    pub last_active: u64, 
+
+    // Game Statistics
     pub total_games_played: u32,
     pub total_wins: u32,
+    pub total_podium_finishes: u32,
+    pub best_win_streak: u32,
+    pub current_win_streak: u32, 
+    pub total_correct_answers: u32,
     pub total_losses: u32,
-    pub current_win_streak: u32,            // Current consecutive wins
-    pub best_win_streak: u32,               // Best ever win streak
-    pub total_score: u64,                   // Increased from u32 for larger scores
-    pub average_score: u32,                 // Calculated average score per game
+    pub total_questions_answered: u32,
+
+    // Performance Metrics
+    pub total_points_earned: u64,
+    pub average_score_per_game: u32,
+    pub fastest_correct_answer: u32,
+    pub average_answer_time: u32,
     pub total_time_played: u64,
-    pub average_answer_time: u32,           // Average time per answer in seconds
-    pub last_active: u64,
+    pub total_score: u64,                   
+    pub average_score: u32,                
+
+    // Rewards & Economics    
+    pub total_earnings: u256,
+    pub current_balance: u256, 
+
     pub achievements_completed: u32,
-    pub player_tier: PlayerTier,            // Ranking tier
-    pub tier_points: u32,                   // Points toward next tier
-    pub total_earnings: u256,               // Total crypto earned
-    pub favorite_category: felt252,         // Most played category
-    pub games_created: u32,                 // Number of quizzes created
-    pub is_active: bool,                    // Account status
-    
-    // Creator-specific fields (optional, only populated if player creates quizzes)
-    pub creator_profile: Option<CreatorProfile>,
+    pub player_tier: PlayerTier,            
+    pub tier_points: u32,                   
+    pub favorite_category: felt252,         
+    pub games_created: u32,                     
+    pub is_active: bool,                    
+   
+    //Creator Stats
+    pub quizzes_created: u32,
+    pub total_quiz_plays: u32,
+    pub creator_rating: u32,    
+
+    // Achievement and Badges
+    pub achievements_unlocked: Array<u16>,
+    pub badges_earned: Array<u8>
 }
 
-// Creator profile struct that gets embedded in Player
-#[derive(Copy, Drop, Serde, Debug, Introspect)]
-pub struct CreatorProfile {
-    pub creator_since: u64,                 // When they created their first quiz
-    pub verified: bool,                     // Creator verification status
-    pub verification_level: CreatorTier,    // Bronze, Silver, Gold, Platinum
-    pub total_quiz_plays: u64,              // Sum of all plays across all quizzes
-    pub total_creator_earnings: u256,       // Total earnings from quiz creation
-    pub average_quiz_rating: u32,           // Average rating across all quizzes (scaled by 100)
-    pub total_quiz_ratings: u32,
-    pub featured_quizzes: u32,              // Number of featured quizzes
-    pub monthly_quiz_limit: u32,            // Quiz creation limit per month
-    pub quizzes_created_this_month: u32,
-    pub creator_rank: u32,                  // Global creator ranking
-    pub specialization_category: felt252,   // Main category they create for
-    pub creator_badge: felt252,             // Special badge/title
-    pub follower_count: u32,                // If you have a follow system
-    pub total_player_hours: u64,            // Total hours players spent on their quizzes
-    pub quality_score: u32,                 // Algorithm-based quality score
-    pub last_quiz_created: u64,
-    pub creator_achievements: u32,          // Number of creator-specific achievements
-}
-
-// Creator tier enum
 #[derive(Copy, Drop, Serde, Debug, Introspect)]
 pub enum CreatorTier {
     Unverified,
@@ -121,95 +119,82 @@ pub enum CreatorTier {
     Diamond,
 }
 
-// Enhanced PlayerAchievement to handle both player and creator achievements
-#[derive(Copy, Drop, Serde, Debug)]
-#[dojo::model]
-pub struct PlayerAchievement {
-    #[key]
-    pub player: ContractAddress,
-    #[key]
-    pub achievement_type: AchievementType,  // Now includes creator achievements
-    pub earned_at: u64,
-    pub progress: u32,
-    pub target: u32,                        // Target value for achievement
-    pub completed: bool,
-    pub reward_claimed: bool,               // Whether reward was claimed
-    pub reward_amount: u256,                // Reward for this achievement
-    pub is_creator_achievement: bool,       // Flag to distinguish achievement types
+pub trait PlayerTrait {
+    fn new(address: ContractAddress, nickname: ByteArray, avatar_id: u8) -> Player; 
+    fn update_stats_after_game(ref self:Player, score:u32, position: u8, correct_answers: u32, total_questions: u32);
 }
 
-// pub trait PlayerTrait{
-//     fn initialize_creator_profile(ref self: ContractState, current_time: u64);
-//     fn is_creator(self: @ContractState) -> bool;
-//     fn get_creator_profile(self: @ContractState) -> Option<CreatorProfile>;
-    
-// }
+pub impl PlayerImpl of PlayerTrait {
+    fn new(address: ContractAddress, nickname: ByteArray, avatar_id: u8) -> Player {
+        Player{
+            address,
+            nickname,
+            avatar_id,
+            created_at: get_block_timestamp(),
+            last_active: get_block_timestamp(),
+            is_active: true,
 
-// impl PlayerImpl of PlayerTrait {
-//     // Initialize creator profile when player creates their first quiz
-//     fn initialize_creator_profile(ref self: ContractState, current_time: u64) {
-//         if self.creator_profile.is_none() {
-//             self.creator_profile = Option::Some(CreatorProfile {
-//                 creator_since: current_time,
-//                 verified: false,
-//                 verification_level: CreatorTier::Unverified,
-//                 total_quiz_plays: 0,
-//                 total_creator_earnings: 0,
-//                 average_quiz_rating: 0,
-//                 total_quiz_ratings: 0,
-//                 featured_quizzes: 0,
-//                 monthly_quiz_limit: 10, // Default limit
-//                 quizzes_created_this_month: 0,
-//                 creator_rank: 0,
-//                 specialization_category: 0,
-//                 creator_badge: 0,
-//                 follower_count: 0,
-//                 total_player_hours: 0,
-//                 quality_score: 0,
-//                 last_quiz_created: current_time,
-//                 creator_achievements: 0,
-//             });
-//         }
+            // initialize state 
+            total_games_played: 0,
+            total_wins: 0,
+            total_podium_finishes: 0,
+            total_questions_answered: 0,   
+            best_win_streak: 0,
+            current_win_streak: 0,
+            total_correct_answers: 0,
+            total_losses: 0,
+            
+            // performance
+            total_points_earned: 0,
+            average_score_per_game: 0,
+            fastest_correct_answer: 0,
+            average_answer_time: 0,
+            total_time_played: 0,
+            total_score: 0,
+            average_score: 0,
 
-//     }
-    
-//     // Check if player is a creator
-//     fn is_creator(self: @ContractState) -> bool {
-//         if self.creator_profile{
-//             true
-//         }else{
-//             false
-//         }
-//     }
-    
-//     // Get creator profile reference
-//     fn get_creator_profile(self: @ContractState) -> Option<CreatorProfile> {
-//         self.creator_profile
-//     }
-// }
+            // Economics
+            total_earnings: 0,
+            current_balance: 0,
+            achievements_completed: 0,
+            player_tier: PlayerTier::Bronze,
+            tier_points: 0,
+            favorite_category: 0,
+            games_created: 0,
+            
+            // Creator
+            quizzes_created: 0,
+            total_quiz_plays: 0,
+            creator_rating: 0,
 
-// Enhanced PlayerQuizCreation remains the same but now works with creator profile
-#[derive(Copy, Drop, Serde, Debug, Introspect)]
-#[dojo::model]
-pub struct PlayerQuizCreation {
-    #[key]
-    pub player: ContractAddress,
-    #[key]
-    pub quiz_id: felt252,                   // Unique quiz ID instead of title
-    pub quiz_title: felt252,
-    pub created_at: u64,
-    pub updated_at: u64,                    // Last modification time
-    pub num_of_questions: u32,
-    pub times_played: u32,                  // Renamed for clarity
-    pub total_players: u32,
-    pub total_rewards_distributed: u256,
-    pub status: PlayerQuizCreationStatus,
-    pub difficulty: QuizDifficulty,         // Quiz difficulty level
-    pub category: felt252,                  // Quiz category
-    pub average_score: u32,                 // Average score of players
-    pub average_completion_time: u64,       // Average time to complete
-    pub creator_earnings: u256,             // How much creator earned
-    pub is_featured: bool,                  // Whether quiz is featured
-    pub rating: u8,                         // User rating out of 5
-    pub total_ratings: u32,                 // Number of ratings received
+            // Achievement
+            achievements_unlocked: ArrayTrait::new(),
+            badges_earned: ArrayTrait::new()
+        }
+    }
+
+    fn update_stats_after_game(ref self:Player, score:u32, position: u8, correct_answers: u32, total_questions: u32) {
+        self.total_games_played += 1;
+        self.total_correct_answers += correct_answers;
+        self.total_questions_answered += total_questions;
+        self.total_points_earned += score.into();
+
+        if position == 1 {
+            self.total_wins += 1;
+            self.current_win_streak += 1;
+            if self.current_win_streak > self.best_win_streak {
+                self.best_win_streak = self.current_win_streak;
+            }
+        } else {
+            self.current_win_streak = 0;
+        }
+
+        if position <= 3 {
+            self.total_podium_finishes += 1;
+        }
+
+        self.average_score_per_game = (self.total_points_earned / self.total_games_played.into()).try_into().unwrap();
+
+        self.last_active = get_block_timestamp();
+    }
 }

@@ -26,30 +26,13 @@ pub trait IZappQuiz<T> {
     token_address: ContractAddress
     ) -> u256;
 
-    fn create_game_session(
-        ref self: T,
-        quiz_id: u256,
-        max_players: u32,
-    ) -> u256;
-
-    fn join_game_session(
-        ref self: T,
-        session_id: u256,
-        player: ContractAddress
-    );
-
-    fn start_game_session(
-        ref self: T,
-        session_id: u256,
-    );
-
-    fn next_question(
-            ref self: T,
-            session_id: u256);
-
+    fn create_game_session(ref self: T, quiz_id: u256, max_players: u32) -> u256;
+    fn join_game_session(ref self: T, session_id: u256, player: ContractAddress);
+    fn start_game_session(ref self: T, session_id: u256);
+    fn next_question(ref self: T, session_id: u256);
+    fn submit_answer(ref self: T, session_id: u256, question_num: u32, answer: u8);
     fn get_quiz(self: @T, quiz_id: u256) -> Quiz;
     fn create_new_quiz_id(ref self: T,) -> u256;
     fn create_new_question_id(ref self: T,) -> u256;
     fn create_new_game_id(ref self: T,) -> u256;
-
 }

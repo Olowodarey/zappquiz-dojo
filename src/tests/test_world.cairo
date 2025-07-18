@@ -122,7 +122,7 @@ mod tests {
         );
 
         questions.append(question_1);
-        // questions.append(question_2);
+        questions.append(question_2);
 
         let mut prize_percentage = ArrayTrait::new();
 
